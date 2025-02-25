@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="#">
+    <link rel="stylesheet" href="/css/video-chat.css">
+    <title>CODEGRASS - VIDEOCHAT</title>
+</head>
+<body>
+
+<div id="videoContainer">
+    <!-- 매니저 비디오 (왼쪽 절반) -->
+    <div id="managerVideoContainer">
+        <video id="managerVideo" autoplay muted></video>
+
+        <!-- 메뉴바 추가 -->
+        <div id="managerMenuBar">
+            <button id="toggleScreenShare"></button>
+        </div>
+    </div>
+
+    <!-- 멤버 비디오 (오른쪽 절반) -->
+    <div id="memberVideos">
+        <!-- `webrtc.js`에서 동적으로 멤버 비디오 추가 -->
+    </div>
+</div>
+
+<script src='/js/webrtc.js'></script>
+<script type="module" src="/js/video-grid.js" defer></script>
+<script type="module" src="/js/screen-share.js" defer></script>
+<script>
+    function showButton() {
+        document.getElementById("toggleScreenShare").style.display = "block";
+    }
+
+    function hideButton() {
+        document.getElementById("toggleScreenShare").style.display = "none";
+    }
+</script>
+</body>
+</html>

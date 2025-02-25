@@ -1,0 +1,126 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+
+/* 비디오 컨테이너 (전체) */
+#videoContainer {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    background-color: #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* 매니저 비디오 (왼쪽 반 차지) */
+#managerVideoContainer {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: black;
+    position: relative;
+}
+
+#managerVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+}
+
+/* 멤버 비디오 (오른쪽, 네모 형태로 전체 채움) */
+#memberVideos {
+    width: 50%;
+    height: 100%;
+    display: grid;
+    gap: 2px;
+    background-color: #ddd;
+    overflow: hidden;
+    justify-content: center;
+    align-content: center;
+}
+
+/* 멤버 개별 비디오들 */
+video.memberVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-image: url('../images/empty-slot.png'); /* 외부 이미지 URL */
+    background-color: rgb(76, 78, 82);
+    background-size: 40px;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: 2px solid rgba(0, 0, 0, 0.8); /* 멤버 비디오들 사이에도 동일한 검정색 경계선 */
+}
+
+/* 하단 메뉴바 */
+#managerMenuBar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50px; /* 메뉴바 높이 */
+    background-color: rgba(0, 0, 0, 0.6); /* 반투명 검은 배경 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 화면전환 버튼 (아이콘 스타일) */
+#toggleScreenShare {
+    width: 40px;
+    height: 40px;
+    background: url('../images/screen-share.png') no-repeat center;
+    background-size: 60%;
+    background-color: rgba(255, 255, 255, 0.2); /* 반투명 흰색 */
+    border: none;
+    border-radius: 8px; /* 둥근 모서리 */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#toggleScreenShare:hover {
+    background-color: rgba(255, 255, 255, 0.4); /* 마우스 올렸을 때 */
+}
+
+/* 비디오를 감싸는 래퍼 */
+.video-wrapper {
+    position: relative; /* 내부 요소 정렬을 위해 relative 설정 */
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+}
+
+/* 비디오 요소 */
+.memberVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 비디오 위에 표시될 사용자 이름 */
+.video-label {
+    position: absolute;
+    bottom: 5px; /* 비디오 상단에 위치 */
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6); /* 가독성을 위한 반투명 배경 */
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 5px;
+    white-space: nowrap;
+    z-index: 10; /* 비디오 위에 나타나도록 설정 */
+
+    width: 100px; /* 필요한 너비 설정 */
+    overflow: hidden; /* 넘치는 내용 숨김 */
+    text-overflow: ellipsis; /* ... 표시 */
+}
+

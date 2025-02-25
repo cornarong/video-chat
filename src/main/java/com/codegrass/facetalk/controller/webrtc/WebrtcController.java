@@ -14,7 +14,7 @@ public class WebrtcController {
     public String videoChat(@PathVariable String roomId, @PathVariable String type, Model model) {
         if("member".equals(type) || "manager".equals(type)) {
             model.addAttribute("roomId", roomId);
-            return "videoChat";
+            return "video-chat";
         }
         return null;
     }

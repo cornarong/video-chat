@@ -98,10 +98,19 @@ socket.onmessage = async (event) => {
                 if (remoteVideo) {
                     remoteVideo.srcObject = null; // 영상 제거
                     remoteVideo.removeAttribute("id"); // ID 제거 (슬롯 재사용 가능)
-                    remoteVideo.style.backgroundImage = "url('/image/old_people.png')"; // 외부 이미지 URL
-                    remoteVideo.style.backgroundSize = "cover";
+                    remoteVideo.style.backgroundImage = "url('/images/empty-slot.png')"; // 외부 이미지 URL
+                    remoteVideo.style.backgroundColor = "rgb(76, 78, 82)";
+                    remoteVideo.style.backgroundSize = "40px";
                     remoteVideo.style.backgroundPosition = "center";
                     remoteVideo.style.backgroundRepeat = "no-repeat";
+
+                    const videoWrapper = remoteVideo.parentElement;
+                    if (videoWrapper) {
+                        const label = videoWrapper.querySelector(".video-label");
+                        if (label) {
+                            label.remove(); // label (멤버이름) 제거
+                        }
+                    }
                 }
                 break;
 
@@ -116,33 +125,44 @@ socket.onmessage = async (event) => {
 
 async function getMediaStream() {
     try {
+        // 카메라, 마이크 디바이스 장치 조회
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === "videoinput");
         const hasAudio = devices.some(device => device.kind === "audioinput");
 
-        let videoStream, audioStream;
+        // 기본값 설정 : 검은 화면 & 무음 트랙
+        let videoStream = new MediaStream([createBlackVideoTrack()]);
+        let audioStream = new MediaStream([createSilentAudioTrack()]);
 
-        // 카메라가 있을 경우, `type`에 따라 해상도를 다르게 설정하여 미디어 스트림을 가져옴.
-        // 관리자(manager)는 1920x1080 해상도 (Full HD, 30fps)로 설정됨.
-        // 일반 멤버(member)는 160x120 해상도 (저해상도, 15fps)로 설정됨.
-        // 여기서 설정된 해상도가 다른 사용자에게 송출될 최종 해상도를 결정함.
-        if (videoDevices.length > 0) {
-            videoStream = await navigator.mediaDevices.getUserMedia({
-                video: type === 'manager'
-                    ? { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { max: 30 } }
-                    : { width: { ideal: 160 }, height: { ideal: 120 }, frameRate: { max: 10 } }
-            });
-        } else {
-            console.warn("사용 가능한 카메라가 없습니다. 빈 화면을 반환합니다.");
-            videoStream = new MediaStream([createBlackVideoTrack()]); // 카메라가 없을 경우, 검은 화면 트랙 반환
+        // 카메라, 마이크 디바이스 권한 확인
+        const camPermissions = await checkCamPermissions();
+        console.log(`카메라 권한 상태: ${camPermissions.camera}`);
+
+        const micPermissions = await checkMicPermissions();
+        console.log(`마이크 권한 상태: ${micPermissions.microphone}`);
+
+        if ("granted" === camPermissions.camera) {
+            // 멤버의 `type` 에 따라 해상도를 다르게 설정하여 미디어 스트림을 가져옴.
+            // 관리자(manager)는 1920x1080 해상도 (Full HD, 30fps)로 설정됨.
+            // 일반 멤버(member)는 160x120 해상도 (저해상도, 15fps)로 설정됨.
+            // 여기서 설정된 해상도가 다른 사용자에게 송출될 최종 해상도를 결정함.
+            if (videoDevices.length > 0) {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: type === 'manager'
+                        ? {width: {ideal: 1920}, height: {ideal: 1080}, frameRate: {max: 30}}
+                        : {width: {ideal: 160}, height: {ideal: 120}, frameRate: {max: 10}}
+                });
+            } else {
+                console.warn("사용 가능한 카메라가 없습니다. 빈 화면을 반환합니다.");
+            }
         }
 
-        // 마이크가 있으면 기본 마이크 사용, 없으면 무음 트랙 반환
-        if (hasAudio) {
-            audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
-        } else {
-            console.warn("사용 가능한 마이크가 없습니다. 무음 트랙을 반환합니다.");
-            audioStream = new MediaStream([createSilentAudioTrack()]); // 무음 트랙 반환
+        if ("granted" === micPermissions.microphone) {
+            if (hasAudio) {
+                audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
+            } else {
+                console.warn("사용 가능한 마이크가 없습니다. 무음 트랙을 반환합니다.");
+            }
         }
 
         // 비디오 + 오디오 트랙을 하나의 스트림으로 합치기
@@ -151,10 +171,27 @@ async function getMediaStream() {
         audioStream.getTracks().forEach(track => combinedStream.addTrack(track));
 
         return combinedStream;
+
     } catch (error) {
         console.error("미디어 스트림 가져오기 실패:", error);
-        return new MediaStream([createBlackVideoTrack(), createSilentAudioTrack()]); // 최악의 경우 빈 스트림 반환
+        return new MediaStream([createBlackVideoTrack(), createSilentAudioTrack()]);
     }
+}
+
+// 카메라 허용 여부 판단 ("granted" = 허용됨, "denied" = 차단됨, "prompt" = 요청 전)
+async function checkCamPermissions() {
+    const camPermission = await navigator.permissions.query({name: "camera"});
+    return {
+        camera: camPermission.state
+    };
+}
+
+// 마이크 허용 여부 판단 ("granted" = 허용됨, "denied" = 차단됨, "prompt" = 요청 전)
+async function checkMicPermissions() {
+    const micPermission = await navigator.permissions.query({name: "microphone"});
+    return {
+        microphone: micPermission.state,
+    };
 }
 
 // 검은 화면을 위한 비디오 트랙 생성
@@ -175,18 +212,33 @@ function createSilentAudioTrack() {
     return destination.stream.getAudioTracks()[0];
 }
 
-// 멤버 화면 생성
+// 멤버 화면 생성 + 멤버 이름 생성
 function addMemberVideo(sessionId, stream) {
     console.log('멤버 화면 추가:', sessionId);
 
     const memberVideosContainer = document.getElementById('memberVideos');
-    const emptySlot = Array.from(memberVideosContainer.children).find(video => !video.srcObject);
 
-    if (emptySlot) {
+    // `video-wrapper` 안에서 빈 `video` 찾기
+    const emptyWrapper = Array.from(memberVideosContainer.children).find(wrapper => {
+        const video = wrapper.querySelector("video");
+        return video && !video.srcObject; // video 태그가 있고, 태그 안이 비어있는 경우 찾기
+    });
+
+    if (emptyWrapper) {
+        const emptySlot = emptyWrapper.querySelector("video");
         emptySlot.srcObject = stream;
         emptySlot.id = sessionId;
+
+        // 항상 새로운 `label`을 생성하여 추가
+        const label = document.createElement("span");
+        label.classList.add("video-label");
+        label.innerText = sessionId;
+
+        emptyWrapper.appendChild(label); // `video-wrapper` 안에 추가
+
     } else {
         console.warn('모든 슬롯이 이미 사용 중입니다.');
+        alert('채팅방 인원이 가득 찼습니다.');
     }
 }
 
