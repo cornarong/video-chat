@@ -1,4 +1,5 @@
-# FaceTalk
+### 📌 FaceTalk
+<h6>
 
 WebRTC와 WebSocket을 활용하여 실시간 화상 채팅을 제공하는 프로젝트.
 
@@ -6,17 +7,21 @@ WebRTC와 WebSocket을 활용하여 실시간 화상 채팅을 제공하는 프�
 - 방 개념 추가 : 사용자들이 참여할 수 있는 개별 화상 채팅 방을 생성 및 관리
 - 방장 기능 추가 : 화면 공유 및 사용자 관리 기능(강퇴, 음소거 등)
 
+<br>
+
 Java Spring (시그널링 서버)
 - WebSocket을 활용한 시그널링 통신 중계 및 관리.
 - 연결 요청, Offer/Answer 교환, ICE Candidate 처리.
 - 클라이언트 채팅방 생성 및 방장·멤버 관리.
+
+<br>
 
 WebRTC API:
 - 브라우저 내 P2P 미디어 스트림(음성/영상) 송수신.
 - ICE Candidate 교환을 통해 네트워크 연결 최적화.
 - SDP 정보 교환을 통한 WebRTC 연결 설정.
 
-## 📌 프로젝트 구조
+### 📌 프로젝트 구조
 
 ```
 FaceTalk
@@ -36,8 +41,10 @@ FaceTalk
 │   └── templates/video-chat.html  # 채팅 페이지 뷰 템플릿
 ```
 
-## 📌 주요 기능
 
+### 📌 주요 기능
+<h6>
+  
 - **WebRTC 기반 다자간 화상 채팅**
 - **WebSocket을 통한 시그널링 처리**
 - **관리자/일반 사용자 역할 구분**
