@@ -7,63 +7,61 @@ document.addEventListener("DOMContentLoaded", function () {
         const managerVideo = document.getElementById("managerVideo");
 
         if (!isScreenSharing) {
+            console.log('화면공유 시작.');
             try {
-                // 화면 공유 스트림 가져오기
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
 
-                // 기존 로컬 스트림 저장
-                if (!originalStream) {
-                    originalStream = localStream;
-                }
+                if (!originalStream) originalStream = managerVideo.srcObject;
+                managerVideo.srcObject = screenStream; // 화면 공유 스트림을 비디오 태그에 적용
 
-                // 화면 공유 스트림을 managerVideo에 적용
-                managerVideo.srcObject = screenStream;
-
-                // 기존 PeerConnection에서 비디오 트랙 교체
                 const videoTrack = screenStream.getVideoTracks()[0];
-
                 Object.values(peerConnections).forEach(peerConnection => {
                     const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-                    if (sender) {
-                        sender.replaceTrack(videoTrack);
-                    }
+                    if (sender) sender.replaceTrack(videoTrack); // PeerConnection에 공유 화면 적용
                 });
+
+                const screenTrack = screenStream.getVideoTracks()[0]; // 화면 공유 비디오 트랙 가져오기
+
+                // 기존 로컬 스트림에서 비디오 트랙을 교체
+                if (window.localStream) {
+                    const audioTracks = window.localStream.getAudioTracks(); // 기존 오디오 트랙 유지
+                    window.localStream = new MediaStream([screenTrack, ...audioTracks]); // 로컬 스트림 업데이트
+                }
+
+                screenStream.getTracks()[0].onended = stopScreenShare; // 화면 공유 종료 시 원래 화면 복원
 
                 isScreenSharing = true;
 
-                // 화면 공유 종료 시 원래 카메라 스트림으로 복귀
-                screenStream.getTracks()[0].onended = function () {
-                    managerVideo.srcObject = originalStream;
-
-                    // 원래 카메라 트랙 복귀
-                    const cameraTrack = originalStream.getVideoTracks()[0];
-                    Object.values(peerConnections).forEach(peerConnection => {
-                        const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-                        if (sender) {
-                            sender.replaceTrack(cameraTrack);
-                        }
-                    });
-
-                    isScreenSharing = false;
-                };
-
             } catch (error) {
-                console.error("화면 공유 실패:", error);
+                console.error("화면 공유 실패: ", error);
             }
         } else {
-            // 화면 공유 중이라면 원래 카메라 화면으로 복귀
-            managerVideo.srcObject = originalStream;
-
-            // 원래 카메라 트랙 복귀
-            const cameraTrack = originalStream.getVideoTracks()[0];
-            Object.values(peerConnections).forEach(peerConnection => {
-                const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-                if (sender) {
-                    sender.replaceTrack(cameraTrack);
-                }
-            });
-
-            isScreenSharing = false;
+            stopScreenShare(); // 화면 공유 중이면 중지
         }
     });
+
+    function stopScreenShare() {
+        console.log('화면공유 종료.');
+        const managerVideo = document.getElementById("managerVideo");
+
+        if (originalStream) {
+            managerVideo.srcObject = originalStream; // 원래 카메라 스트림 복원
+            const cameraTrack = originalStream.getVideoTracks()[0];
+
+            Object.values(peerConnections).forEach(peerConnection => {
+                const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
+                if (sender) sender.replaceTrack(cameraTrack); // `PeerConnection`에 카메라 스트림 적용
+            });
+
+            // 기존 로컬 스트림에서 비디오 트랙을 교체
+            if (window.localStream) {
+                const audioTracks = window.localStream.getAudioTracks(); // 기존 오디오 트랙 유지
+                window.localStream = new MediaStream([cameraTrack, ...audioTracks]); // 로컬 스트림 업데이트
+            }
+        }
+
+        isScreenSharing = false;
+        originalStream = null;
+        screenStream = null;
+    }
 });

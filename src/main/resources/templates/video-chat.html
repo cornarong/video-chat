@@ -17,15 +17,24 @@
         <!-- 메뉴바 추가 -->
         <div id="managerMenuBar">
             <button id="toggleScreenShare"></button>
+            <button id="toggleMemberListPanel"></button>
         </div>
     </div>
 
     <!-- 멤버 비디오 (오른쪽 절반) -->
-    <div id="memberVideos">
-        <!-- `webrtc.js`에서 동적으로 멤버 비디오 추가 -->
+    <div id="memberVideos"></div>
+
+    <!-- 멤버 리스트 패널 -->
+    <div id="memberListPanel">
+        <div id="memberListHeader">
+            <span>member list</span>
+            <button id="closeMemberListPanel">X</button>
+        </div>
+        <ul id="memberList"></ul>
     </div>
 </div>
 
+<script type="module" src="/js/member-panel.js" defer></script>
 <script src='/js/webrtc.js'></script>
 <script type="module" src="/js/video-grid.js" defer></script>
 <script type="module" src="/js/screen-share.js" defer></script>

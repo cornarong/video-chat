@@ -1,16 +1,16 @@
 const path = window.location.pathname;
 const roomId = path.split("/")[2];  // 방번호
-const type = path.split("/")[3];    // 회원 or 관리자
+const myType = path.split("/")[3];    // 회원 or 관리자
 
 let mySessionId = sessionStorage.getItem('sessionId') || '';
-
-let localStream;
 let peerConnections = {};  // 각 방의 PeerConnection 관리
 let signalingQueues = {};  // 각 PeerConnection Offer/Answer 처리를 위한 큐 관리 객체
 let sentIceCandidates = new Set();  // 중복된 ICE 후보 전송 방지용
 
+window.localStream = null;
+
 // WebSocket 연결
-const socket = new WebSocket(`wss://${location.host}/ws/${roomId}/${type}`);
+const socket = new WebSocket(`wss://${location.host}/ws/${roomId}/${myType}`);
 
 socket.onopen = () => {
     console.log('WebSocket 연결 성공');
@@ -23,34 +23,30 @@ socket.onopen = () => {
     }, 15000); // 15초
 };
 
-
 socket.onclose = () => {
     console.log('WebSocket 연결 종료');
 };
 
 // WebSocket 메시지 수신 시
 socket.onmessage = async (event) => {
+
     try {
         const message = JSON.parse(event.data);
-        console.log('받은 message : ', message);
+        //console.log('받은 message : ', message);
 
-        if (!localStream) {
+        if (!window.localStream) {
             try {
-                localStream = await getMediaStream();
+                window.localStream = await getMediaStream();
             } catch (error) {
+                window.localStream = new MediaStream(); // 빈 스트림 반환
                 console.error("미디어 스트림 설정 실패:", error);
-                localStream = new MediaStream(); // 비상시 빈 스트림 반환
             }
 
             // 관리자 화면 생성
-            console.log('type :', type)
-            if (type === 'manager') {
-                const managerVideo = document.getElementById("managerVideo");
-                managerVideo.srcObject = localStream;
-            } else {
-                // 멤버 화면 생성
-                addMemberVideo(mySessionId, localStream);
-            }
+            if (myType === 'manager') addManagerVideo(window.localStream);
+
+            // 멤버 화면 생성
+            if (myType === 'member') addMemberVideo(mySessionId, window.localStream);
         }
 
         switch (message.event) {
@@ -69,16 +65,16 @@ socket.onmessage = async (event) => {
                 console.log(`사용자 접속 : ${message.sessionId}`);
                 // 기존 방에있는 멤버 입장에서의 화면 생성 (join-member 받고 생성)
                 if (!peerConnections[message.sessionId]) {
-                    createPeerConnection(message.sessionId, message.type, message.event);
+                    await createPeerConnection(message.sessionId, message.type, message.event);
                 }
                 break;
 
             case 'offer':
-                handleOffer(message.sessionId, message.sdp, message.type, message.event);
+                await handleOffer(message.sessionId, message.sdp, message.type, message.event);
                 break;
 
             case 'answer':
-                handleAnswer(message.sessionId, message.sdp);
+                await handleAnswer(message.sessionId, message.sdp);
                 break;
 
             case 'ice-candidate':
@@ -90,28 +86,8 @@ socket.onmessage = async (event) => {
                 if (peerConnections[message.sessionId]) {
                     peerConnections[message.sessionId].close();
                     delete peerConnections[message.sessionId];
-                    console.log(`peerConnections에서 ${message.sessionId} 제거 완료`);
                 }
-
-                // 원격 비디오 삭제
-                const remoteVideo = document.getElementById(message.sessionId);
-                if (remoteVideo) {
-                    remoteVideo.srcObject = null; // 영상 제거
-                    remoteVideo.removeAttribute("id"); // ID 제거 (슬롯 재사용 가능)
-                    remoteVideo.style.backgroundImage = "url('/images/empty-slot.png')"; // 외부 이미지 URL
-                    remoteVideo.style.backgroundColor = "rgb(76, 78, 82)";
-                    remoteVideo.style.backgroundSize = "40px";
-                    remoteVideo.style.backgroundPosition = "center";
-                    remoteVideo.style.backgroundRepeat = "no-repeat";
-
-                    const videoWrapper = remoteVideo.parentElement;
-                    if (videoWrapper) {
-                        const label = videoWrapper.querySelector(".video-label");
-                        if (label) {
-                            label.remove(); // label (멤버이름) 제거
-                        }
-                    }
-                }
+                removeMemberVideo(message.sessionId);
                 break;
 
             default:
@@ -143,12 +119,10 @@ async function getMediaStream() {
 
         if ("granted" === camPermissions.camera) {
             // 멤버의 `type` 에 따라 해상도를 다르게 설정하여 미디어 스트림을 가져옴.
-            // 관리자(manager)는 1920x1080 해상도 (Full HD, 30fps)로 설정됨.
-            // 일반 멤버(member)는 160x120 해상도 (저해상도, 15fps)로 설정됨.
             // 여기서 설정된 해상도가 다른 사용자에게 송출될 최종 해상도를 결정함.
             if (videoDevices.length > 0) {
                 videoStream = await navigator.mediaDevices.getUserMedia({
-                    video: type === 'manager'
+                    video: myType === 'manager'
                         ? {width: {ideal: 1920}, height: {ideal: 1080}, frameRate: {max: 30}}
                         : {width: {ideal: 160}, height: {ideal: 120}, frameRate: {max: 10}}
                 });
@@ -212,8 +186,14 @@ function createSilentAudioTrack() {
     return destination.stream.getAudioTracks()[0];
 }
 
-// 멤버 화면 생성 + 멤버 이름 생성
-function addMemberVideo(sessionId, stream) {
+// 관리자 화면 생성
+function addManagerVideo(localStream) {
+    const managerVideo = document.getElementById("managerVideo");
+    managerVideo.srcObject = localStream;
+}
+
+// 멤버 화면 생성 + 멤버 이름 노출 + 멤버 리스트에 이름 추가
+function addMemberVideo(sessionId, localStream) {
     console.log('멤버 화면 추가:', sessionId);
 
     const memberVideosContainer = document.getElementById('memberVideos');
@@ -226,7 +206,7 @@ function addMemberVideo(sessionId, stream) {
 
     if (emptyWrapper) {
         const emptySlot = emptyWrapper.querySelector("video");
-        emptySlot.srcObject = stream;
+        emptySlot.srcObject = localStream;
         emptySlot.id = sessionId;
 
         // 항상 새로운 `label`을 생성하여 추가
@@ -236,17 +216,60 @@ function addMemberVideo(sessionId, stream) {
 
         emptyWrapper.appendChild(label); // `video-wrapper` 안에 추가
 
+        // 멤버리스트에 사용자 추가 (중복 방지) : member-panel.js의 members 배열에 추가
+        if (!window.members.includes(sessionId)) {
+            window.members.push(sessionId);
+
+            // 목록 업데이트 실행 (UI 반영)
+            if (typeof window.updateMemberList === "function") {
+                window.updateMemberList();
+            }
+        }
     } else {
         console.warn('모든 슬롯이 이미 사용 중입니다.');
         alert('채팅방 인원이 가득 찼습니다.');
     }
 }
 
+// 멤버 화면 제거 + 멤버 이름 제거 + 멤버 리스트에 이름 삭제
+function removeMemberVideo(sessionId) {
+    console.log(`멤버 화면 제거: ${sessionId}`);
+
+    // 원격 비디오 삭제
+    const remoteVideo = document.getElementById(sessionId);
+    if (remoteVideo) {
+        remoteVideo.srcObject = null; // 영상 제거
+        remoteVideo.removeAttribute("id"); // ID 제거 (슬롯 재사용 가능)
+        remoteVideo.style.backgroundImage = "url('/images/empty-slot.png')"; // 빈 슬롯 이미지 설정
+        remoteVideo.style.backgroundColor = "rgb(76, 78, 82)";
+        remoteVideo.style.backgroundSize = "40px";
+        remoteVideo.style.backgroundPosition = "center";
+        remoteVideo.style.backgroundRepeat = "no-repeat";
+
+        const videoWrapper = remoteVideo.parentElement;
+        if (videoWrapper) {
+            const label = videoWrapper.querySelector(".video-label");
+            if (label) {
+                label.remove(); // 멤버 이름 제거
+            }
+        }
+    }
+
+    // 멤버리스트에서 사용자 제거 (member-panel.js의 members 배열에서 제거)
+    if (window.members.includes(sessionId)) {
+        window.members = window.members.filter(member => member !== sessionId);
+
+        // 목록 업데이트 실행 (UI 반영)
+        if (typeof window.updateMemberList === "function") {
+            window.updateMemberList();
+        }
+    }
+}
+
 // PeerConnection 생성 및 설정
 async function createPeerConnection(sessionId, type, event) {
-    console.log('sessionId = ', sessionId)
-    console.log('type = ', type)
-    console.log('event = ', event)
+    console.log(`sessionId : ${sessionId}, type : ${type}, event : ${event}`);
+
     if (peerConnections[sessionId]) {
         return;
     }
@@ -268,15 +291,12 @@ async function createPeerConnection(sessionId, type, event) {
         const params = sender.getParameters();
         if (!params.encodings) params.encodings = [{}];
 
-        /*console.log('비트레이트 설정: type = ', type);
-        params.encodings[0].maxBitrate = type === 'manager' ? 5000000 : 100000; // 관리자: 5Mbps, 멤버: 100kbps*/
-
         await sender.setParameters(params);
     };
 
 
-    // 내 로컬 미디어 트랙(비디오/오디오)을 peerConnection에 추가 (상대방과 공유할 트랙 설정)
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    // 내 로컬 미디어 트랙(비디오/오디오)을 `peerConnection`에 추가 (상대방과 공유할 트랙 설정)
+    window.localStream.getTracks().forEach(track => peerConnection.addTrack(track, window.localStream));
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
@@ -293,6 +313,7 @@ async function createPeerConnection(sessionId, type, event) {
     peerConnection.ontrack = (event) => {
         if (!addedStreams.has(event.streams[0].id)) {
             addedStreams.add(event.streams[0].id);
+
             // 관리자 화면 생성
             if (type === 'manager') {
                 const managerVideo = document.getElementById("managerVideo");
@@ -301,6 +322,7 @@ async function createPeerConnection(sessionId, type, event) {
                 // 멤버 화면 생성
                 addMemberVideo(sessionId, event.streams[0]);
             }
+
         } else {
             console.log("중복된 ontrack 실행 방지됨.");
 
@@ -310,7 +332,7 @@ async function createPeerConnection(sessionId, type, event) {
     peerConnections[sessionId] = peerConnection;
 
     if (event === 'join-member') {
-        createOffer(sessionId);
+        await createOffer(sessionId);
     }
 }
 
@@ -347,7 +369,7 @@ async function handleOffer(sessionId, offerSdp, type, event) {
 
     // 새로 들어온 멤버 입장에서의 화면 생성 (offer 받은 후 생성)
     if (!peerConnections[sessionId]) {
-        createPeerConnection(sessionId, type, event);
+        await createPeerConnection(sessionId, type, event);
     }
 
     if (!signalingQueues[sessionId]) {
