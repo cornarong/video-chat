@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const memberVideosContainer = document.getElementById("memberVideos");
+    const memberVideosContainer = document.getElementById("memberVideosContainer");
     const totalSlots = 20; // 최대 20개 슬롯 유지
 
     function updateGrid() {
@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function initializeGrid() {
         for (let i = 0; i < totalSlots; i++) {
-            // 비디오 + 텍스트를 감싸는 래퍼 div 생성 : 텍스트(멤버이름)은 webrtc.js 에서 멤버 화면 생성시 삽입해줌.
+            // 비디오 + 텍스트를 감싸는 래퍼 div 생성 : 텍스트(멤버 이름)는 webrtc.js 내 멤버 화면 생성시 삽입해줌.
             const videoWrapper = document.createElement("div");
             videoWrapper.classList.add("video-wrapper");
 
@@ -27,7 +27,17 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.playsInline = true;
             videoElement.dataset.index = i; // 고유 인덱스 유지
 
-            // videoWrapper 안에 비디오 추가
+            // 오버레이 화면
+            const overlayElement = document.createElement("div");
+            overlayElement.classList.add("overlay");
+            overlayElement.style.width = "100%";
+            overlayElement.style.height = "100%";
+            overlayElement.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+            overlayElement.style.border = "2px solid rgba(0, 0, 0, 0.8)";
+            overlayElement.style.position = "absolute";
+            overlayElement.style.display = "none";
+
+            videoWrapper.appendChild(overlayElement);
             videoWrapper.appendChild(videoElement);
 
             // 컨테이너에 videoWrapper 추가

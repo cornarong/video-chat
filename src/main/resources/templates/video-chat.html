@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="#">
     <link rel="stylesheet" href="/css/video-chat.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans&family=Noto+Sans+KR&display=swap" rel="stylesheet">
+
     <title>CODEGRASS - VIDEOCHAT</title>
 </head>
 <body>
@@ -22,30 +26,31 @@
     </div>
 
     <!-- 멤버 비디오 (오른쪽 절반) -->
-    <div id="memberVideos"></div>
+    <div id="memberVideosContainer"></div>
 
     <!-- 멤버 리스트 패널 -->
     <div id="memberListPanel">
         <div id="memberListHeader">
-            <span>member list</span>
+            <span>참여중인 사용자</span>
             <button id="closeMemberListPanel">X</button>
         </div>
         <ul id="memberList"></ul>
     </div>
 </div>
 
-<script type="module" src="/js/member-panel.js" defer></script>
+<input type="hidden" id="videoModalSessionId" value="">
+<input type="hidden" id="microphoneIsEnabled" value="false">
+
+<!-- 비디오 모달 추가 -->
+<div id="memberVideoModal">
+    <video id="videoModal" autoplay playsinline></video>
+    <button id="closeVideoModalBtn" onclick="closeVideoModal()"></button>
+    <button id="microphoneControlBtn" onclick="sendMicrophone()"></button>
+</div>
+
 <script src='/js/webrtc.js'></script>
+<script type="module" src="/js/member-panel.js" defer></script>
 <script type="module" src="/js/video-grid.js" defer></script>
 <script type="module" src="/js/screen-share.js" defer></script>
-<script>
-    function showButton() {
-        document.getElementById("toggleScreenShare").style.display = "block";
-    }
-
-    function hideButton() {
-        document.getElementById("toggleScreenShare").style.display = "none";
-    }
-</script>
 </body>
 </html>

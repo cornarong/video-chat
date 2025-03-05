@@ -1,6 +1,6 @@
 /* 기본 설정 */
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Noto Sans KR', 'Noto Sans', sans-serif;
     margin: 0;
     padding: 0;
     display: flex;
@@ -39,7 +39,7 @@ body {
 }
 
 /* 멤버 비디오 영역 (오른쪽 절반, 그리드 형태) */
-#memberVideos {
+#memberVideosContainer {
     width: 50%;
     height: 100%;
     display: grid;
@@ -55,7 +55,7 @@ video.memberVideo {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    background-image: url('../images/empty-slot.png'); /* 외부 이미지 URL */
+    background-image: url('../images/empty-slot.png');
     background-color: rgb(76, 78, 82);
     background-size: 40px;
     background-position: center;
@@ -68,8 +68,8 @@ video.memberVideo {
     position: absolute;
     bottom: 0;
     width: 100%;
-    height: 50px; /* 메뉴바 높이 */
-    background-color: rgba(0, 0, 0, 0.6); /* 반투명 검은 배경 */
+    height: 50px;
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -82,10 +82,10 @@ video.memberVideo {
     width: 40px;
     height: 40px;
     background: url('../images/screen-share.png') no-repeat center;
-    background-color: rgba(255, 255, 255, 0.5); /* 반투명 배경 */
+    background-color: rgba(255, 255, 255, 0.5);
     background-size: 60%;
     border: none;
-    border-radius: 8px; /* 둥근 모서리 */
+    border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.3s ease;
 }
@@ -100,7 +100,7 @@ video.memberVideo {
     width: 40px;
     height: 40px;
     background: url('../images/members.png') no-repeat center;
-    background-color: rgba(255, 255, 255, 0.5); /* 반투명 배경 */
+    background-color: rgba(255, 255, 255, 0.5);
     background-size: 65%;
     border: none;
     border-radius: 8px; /* 둥근 모서리 */
@@ -131,16 +131,16 @@ video.memberVideo {
 /* 비디오 위에 표시될 사용자 이름 (라벨) */
 .video-label {
     position: absolute;
-    bottom: 5px; /* 비디오 상단에 위치 */
+    bottom: 5px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.6); /* 반투명 배경 */
+    background: rgba(0, 0, 0, 0.6);
     color: white;
     padding: 4px 8px;
     font-size: 12px;
     border-radius: 5px;
     white-space: nowrap;
-    z-index: 10;
+    z-index: 1;
     width: 100px;
     overflow: hidden;
     text-overflow: ellipsis; /* ... 표시 */
@@ -150,17 +150,17 @@ video.memberVideo {
 #memberListPanel {
     position: fixed; /* 부모 요소 영향 없이 전체 화면 기준 */
     top: 0;
-    right: -300px; /* 기본적으로 화면 밖 */
+    right: -300px; /* 기본적으로 화면 밖 위치 */
     width: 300px;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85); /* 반투명 블랙 */
+    background: rgba(0, 0, 0, 0.85);
     color: white;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
     transition: right 0.4s ease-in-out; /* 부드러운 애니메이션 */
     display: flex;
     flex-direction: column;
     border: 2px solid rgba(0, 0, 0, 0.8);
-    z-index: 100; /* 항상 위에 보이도록 설정 */
+    z-index: 101;
 }
 
 /* 멤버 리스트가 열릴 때 (오른쪽에서 슬라이드) */
@@ -181,7 +181,7 @@ video.memberVideo {
 }
 
 /* 닫기 버튼 스타일 */
-#closeMemberList {
+#closeMemberListPanel {
     background: none;
     border: none;
     color: white;
@@ -192,7 +192,7 @@ video.memberVideo {
 }
 
 /* 닫기 버튼 마우스 오버 효과 */
-#closeMemberList:hover {
+#closeMemberListPanel:hover {
     opacity: 0.7;
 }
 
@@ -214,3 +214,96 @@ video.memberVideo {
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* 모달 부모 컨테이너 (비디오 모달) */
+#memberVideoModal {
+    position: fixed;
+    top: 50%;
+    right: 25%;
+    transform: translate(50%, -50%) scale(0.8); /* 처음에는 작게 시작 */
+    width: 40%;
+    height: auto;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 8px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out; /* 부드럽게 등장 */
+}
+
+#memberVideoModal.show {
+    transform: translate(50%, -50%) scale(1); /* 원래 크기로 확대 */
+    opacity: 1;
+}
+
+/* 내부 비디오 요소 */
+#videoModal {
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+    object-fit: contain;
+    background: black;
+}
+
+/* 닫기 버튼 스타일 */
+#closeVideoModalBtn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 32px;
+    height: 32px;
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url('../images/hidden-video-close.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 1;
+}
+
+/* 마이크 제어 버튼 스타일 */
+#microphoneControlBtn {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 32px;
+    height: 32px;
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url('../images/mic-enabled-false.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 1;
+}
+
+#closeVideoModalBtn:hover {
+    opacity: 1;
+}
+
+/* 스피너 스타일 */
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-top: 5px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* 스피너 회전 애니메이션 */
+@keyframes spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}

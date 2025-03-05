@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
             li.textContent = member;
 
             const button = document.createElement("button");
-            button.textContent = '기능';
+            button.textContent = 'FUNC';
             li.appendChild(button);
 
             memberList.appendChild(li);

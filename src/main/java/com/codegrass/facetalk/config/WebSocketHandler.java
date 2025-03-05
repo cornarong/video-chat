@@ -141,6 +141,10 @@ public class WebSocketHandler extends TextWebSocketHandler {
                     handleIceCandidate(roomId, event, type, sessionId, jsonMessage);
                     break;
 
+                case "microphone":
+                    handleMicrophone(roomId, event, type, sessionId, jsonMessage);
+                    break;
+
                 default:
                     log.warn("알 수 없는 이벤트 = {}", event);
                     break;
@@ -181,6 +185,15 @@ public class WebSocketHandler extends TextWebSocketHandler {
         sendToUser(roomId, event, type, sessionId, recipientSessionId, candidateJson.toString());
     }
 
+    // microphone 핸들러
+    private void handleMicrophone(String roomId, String event, String type, String sessionId, JsonObject jsonMessage) {
+        String recipientSessionId = jsonMessage.get("recipientSessionId").getAsString();
+        String isEnabled = jsonMessage.get("isEnabled").getAsString();
+
+        // 특정 사용자에게 ice-candidate 전달
+        sendMicMessageToUser(roomId, event, type, sessionId, recipientSessionId, isEnabled);
+    }
+
     // 특정 사용자에게만 메시지 전송 (offer, answer, ice-candidate)
     private void sendToUser(String roomId, String event, String type, String sessionId, String recipientSessionId, String data) {
         JsonObject sendJsonMessage = new JsonObject();
@@ -188,6 +201,21 @@ public class WebSocketHandler extends TextWebSocketHandler {
         sendJsonMessage.addProperty("type", type);
         sendJsonMessage.addProperty("sessionId", sessionId);
         sendJsonMessage.addProperty(event.equals("ice-candidate") ? "candidate" : "sdp", data);
+        String sendMessageContent = new Gson().toJson(sendJsonMessage);
+
+        WebSocketSession recipientSession = rooms.get(roomId).get(recipientSessionId);
+        if (recipientSession != null) {
+            sendSafeMessage(recipientSession, sendMessageContent);
+        }
+    }
+
+    // 특정 사용자에게 microphone 메시지 전송 (microphone)
+    private void sendMicMessageToUser (String roomId, String event, String type, String sessionId, String recipientSessionId, String isEnabled) {
+        JsonObject sendJsonMessage = new JsonObject();
+        sendJsonMessage.addProperty("event", event);
+        sendJsonMessage.addProperty("type", type);
+        sendJsonMessage.addProperty("sessionId", sessionId);
+        sendJsonMessage.addProperty("isEnabled", isEnabled);
         String sendMessageContent = new Gson().toJson(sendJsonMessage);
 
         WebSocketSession recipientSession = rooms.get(roomId).get(recipientSessionId);

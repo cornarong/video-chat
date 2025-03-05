@@ -1,6 +1,6 @@
 const path = window.location.pathname;
 const roomId = path.split("/")[2];  // 방번호
-const myType = path.split("/")[3];    // 회원 or 관리자
+const myType = path.split("/")[3];  // 회원 or 관리자
 
 let mySessionId = sessionStorage.getItem('sessionId') || '';
 let peerConnections = {};  // 각 방의 PeerConnection 관리
@@ -14,25 +14,47 @@ const socket = new WebSocket(`wss://${location.host}/ws/${roomId}/${myType}`);
 
 socket.onopen = () => {
     console.log('WebSocket 연결 성공');
-
-    // heartbeat (소켓 연결 유지)
-    setInterval(() => {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({event: "heartbeat"}));
-        }
-    }, 15000); // 15초
+    setInterval(sendHeartbeat, 15000); // 15초
 };
 
 socket.onclose = () => {
     console.log('WebSocket 연결 종료');
 };
 
+// WebSocket 연결 유지 (heartbeat)
+function sendHeartbeat() {
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({event: "heartbeat"}));
+    }
+}
+
+// 카메라 및 마이크 권한 변경을 감지하여 상태가 바뀌면 페이지를 새로고침하는 함수
+async function checkPermissionChanges() {
+    let lastCameraState = (await navigator.permissions.query({name: "camera"})).state;
+    let lastMicState = (await navigator.permissions.query({name: "microphone"})).state;
+
+    setInterval(async () => {
+        const cameraState = (await navigator.permissions.query({name: "camera"})).state;
+        const micState = (await navigator.permissions.query({name: "microphone"})).state;
+
+        if (cameraState !== lastCameraState || micState !== lastMicState) {
+            location.reload();
+        }
+
+        lastCameraState = cameraState;
+        lastMicState = micState;
+    }, 1000); // 1초마다 체크
+}
+
+checkPermissionChanges().then(() => {
+    console.log("카메라 또는 마이크 권한 변경 감지됨. 페이지 새로고침 완료.");
+});
+
 // WebSocket 메시지 수신 시
 socket.onmessage = async (event) => {
 
     try {
         const message = JSON.parse(event.data);
-        //console.log('받은 message : ', message);
 
         if (!window.localStream) {
             try {
@@ -51,22 +73,11 @@ socket.onmessage = async (event) => {
 
         switch (message.event) {
             case 'first-join':
-                console.log('sessionId 전달 받음.');
-                mySessionId = message.sessionId;
-                sessionStorage.setItem('sessionId', mySessionId);
-
-                socket.send(JSON.stringify({
-                    event: 'join-member',
-                    sessionId: mySessionId
-                }));
+                await handleJoinMember(message.sessionId);
                 break;
 
             case 'join-member':
-                console.log(`사용자 접속 : ${message.sessionId}`);
-                // 기존 방에있는 멤버 입장에서의 화면 생성 (join-member 받고 생성)
-                if (!peerConnections[message.sessionId]) {
-                    await createPeerConnection(message.sessionId, message.type, message.event);
-                }
+                await createPeerConnection(message.sessionId, message.type, message.event);
                 break;
 
             case 'offer':
@@ -78,16 +89,15 @@ socket.onmessage = async (event) => {
                 break;
 
             case 'ice-candidate':
-                handleIceCandidate(message.sessionId, message.candidate);
+                await handleIceCandidate(message.sessionId, message.candidate);
                 break;
 
             case 'left-member':
-                console.log(`사용자 퇴장 : ${message.sessionId}`);
-                if (peerConnections[message.sessionId]) {
-                    peerConnections[message.sessionId].close();
-                    delete peerConnections[message.sessionId];
-                }
-                removeMemberVideo(message.sessionId);
+                await removeMemberVideo(message.sessionId);
+                break;
+
+            case 'microphone':
+                await handleIceMicrophone(message.sessionId, message.isEnabled);
                 break;
 
             default:
@@ -112,31 +122,40 @@ async function getMediaStream() {
 
         // 카메라, 마이크 디바이스 권한 확인
         const camPermissions = await checkCamPermissions();
-        console.log(`카메라 권한 상태: ${camPermissions.camera}`);
+        console.log(`[카메라 권한 상태] ${camPermissions.camera}`);
 
         const micPermissions = await checkMicPermissions();
-        console.log(`마이크 권한 상태: ${micPermissions.microphone}`);
+        console.log(`[마이크 권한 상태] ${micPermissions.microphone}`);
 
-        if ("granted" === camPermissions.camera) {
-            // 멤버의 `type` 에 따라 해상도를 다르게 설정하여 미디어 스트림을 가져옴.
-            // 여기서 설정된 해상도가 다른 사용자에게 송출될 최종 해상도를 결정함.
+        // 카메라 권한 확인 및 카메라 가져오기.
+        if ("granted" === camPermissions.camera || "prompt" === camPermissions.camera) {
             if (videoDevices.length > 0) {
                 videoStream = await navigator.mediaDevices.getUserMedia({
                     video: myType === 'manager'
                         ? {width: {ideal: 1920}, height: {ideal: 1080}, frameRate: {max: 30}}
-                        : {width: {ideal: 160}, height: {ideal: 120}, frameRate: {max: 10}}
+                        : {width: {ideal: 1040}, height: {ideal: 600}, frameRate: {max: 15}}
+                    //: {width: {ideal: 160}, height: {ideal: 120}, frameRate: {max: 10}}
                 });
             } else {
                 console.warn("사용 가능한 카메라가 없습니다. 빈 화면을 반환합니다.");
             }
+        } else {
+            alert("카메라 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.");
         }
 
-        if ("granted" === micPermissions.microphone) {
+        // 마이크 권한 확인 및 마이크 가져오기.
+        if ("granted" === micPermissions.microphone || "prompt" === micPermissions.microphone) {
             if (hasAudio) {
                 audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
+                // 오디오 트랙 비활성화 (음소거)
+                audioStream.getAudioTracks().forEach(track => {
+                    track.enabled = false;
+                });
             } else {
                 console.warn("사용 가능한 마이크가 없습니다. 무음 트랙을 반환합니다.");
             }
+        } else {
+            alert("마이크 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.");
         }
 
         // 비디오 + 오디오 트랙을 하나의 스트림으로 합치기
@@ -179,10 +198,16 @@ function createBlackVideoTrack() {
 // 무음 오디오 트랙 생성
 function createSilentAudioTrack() {
     const audioContext = new AudioContext();
-    const oscillator = audioContext.createOscillator();
     const destination = audioContext.createMediaStreamDestination();
-    oscillator.connect(destination);
-    oscillator.start();
+    const gainNode = audioContext.createGain();
+
+    gainNode.gain.value = 0; // 볼륨을 0으로 설정해서 무음으로 만듦
+    gainNode.connect(destination);
+
+    const source = audioContext.createBufferSource(); // 빈 오디오 버퍼 소스 생성
+    source.connect(gainNode);
+    source.start();
+
     return destination.stream.getAudioTracks()[0];
 }
 
@@ -193,10 +218,10 @@ function addManagerVideo(localStream) {
 }
 
 // 멤버 화면 생성 + 멤버 이름 노출 + 멤버 리스트에 이름 추가
-function addMemberVideo(sessionId, localStream) {
-    console.log('멤버 화면 추가:', sessionId);
+function addMemberVideo(sessionId, stream) {
+    console.log(`[멤버화면생성] ${sessionId}`);
 
-    const memberVideosContainer = document.getElementById('memberVideos');
+    const memberVideosContainer = document.getElementById('memberVideosContainer');
 
     // `video-wrapper` 안에서 빈 `video` 찾기
     const emptyWrapper = Array.from(memberVideosContainer.children).find(wrapper => {
@@ -205,9 +230,9 @@ function addMemberVideo(sessionId, localStream) {
     });
 
     if (emptyWrapper) {
-        const emptySlot = emptyWrapper.querySelector("video");
-        emptySlot.srcObject = localStream;
-        emptySlot.id = sessionId;
+        const emptyVideoSlot = emptyWrapper.querySelector("video");
+        emptyVideoSlot.srcObject = stream;
+        emptyVideoSlot.id = sessionId;
 
         // 항상 새로운 `label`을 생성하여 추가
         const label = document.createElement("span");
@@ -215,6 +240,9 @@ function addMemberVideo(sessionId, localStream) {
         label.innerText = sessionId;
 
         emptyWrapper.appendChild(label); // `video-wrapper` 안에 추가
+
+        // 클릭한 비디오를 모달에 표시하는 이벤트 리스너 추가
+        emptyVideoSlot.addEventListener("click", () => showVideoModal(emptyVideoSlot));
 
         // 멤버리스트에 사용자 추가 (중복 방지) : member-panel.js의 members 배열에 추가
         if (!window.members.includes(sessionId)) {
@@ -231,9 +259,65 @@ function addMemberVideo(sessionId, localStream) {
     }
 }
 
-// 멤버 화면 제거 + 멤버 이름 제거 + 멤버 리스트에 이름 삭제
-function removeMemberVideo(sessionId) {
-    console.log(`멤버 화면 제거: ${sessionId}`);
+// 클릭한 비디오를 모달에 표시하고 오버레이를 활성화하는 함수
+function showVideoModal(emptyVideoSlot) {
+    console.log(`비디오 ${emptyVideoSlot.id} 클릭.`);
+
+    // 모달에서 사용할 세션 ID를 설정
+    document.getElementById('videoModalSessionId').value = emptyVideoSlot.id;
+
+    // 멤버 비디오 모달 열기
+    const memberVideoModal = document.getElementById("memberVideoModal");
+    memberVideoModal.style.display = "flex";
+    setTimeout(() => memberVideoModal.classList.add("show"), 10); // 약간의 지연 후 애니메이션 적용
+
+    // 스피너 표시 (비디오 로딩 중)
+    const videoModal = document.getElementById('videoModal');
+
+    const spinner = document.createElement("div");
+    spinner.classList.add("spinner");
+    memberVideoModal.appendChild(spinner); // 모달 내부에 스피너 추가
+
+    // 1초 후 스피너 제거 & 비디오 표시
+    setTimeout(() => {
+        spinner.remove(); // 스피너 삭제
+        videoModal.srcObject = emptyVideoSlot.srcObject;
+    }, 1200); // 1.2초 딜레이
+
+    // 우측 멤버 카메라 오버레이를 보이게 설정
+    document.querySelectorAll(".overlay").forEach(overlayElement => {
+        overlayElement.style.display = "block";
+    });
+}
+
+// 클릭한 비디오를 모달에서 제거하고 오버레이를 비활성화하는 함수
+function closeVideoModal() {
+    const memberVideoModal = document.getElementById("memberVideoModal");
+
+    memberVideoModal.classList.remove("show"); // 애니메이션 효과 제거
+    setTimeout(() => {
+        memberVideoModal.style.display = "none"; // 애니메이션 끝난 후 숨기기
+        const videoModal = document.getElementById("videoModal");
+        videoModal.srcObject = null; // 300ms 후에 실행
+    }, 300);
+
+    // 우측 멤버 카메라 오버레이 숨김 처리
+    const overlayElements = document.querySelectorAll(".overlay");
+    overlayElements.forEach(overlayElement => {
+        overlayElement.style.display = "none";
+    });
+
+    sendMicrophone(false);
+}
+
+// left-member 수신 (멤버 화면 제거 + 멤버 이름 제거 + 멤버 리스트에 이름 삭제)
+async function removeMemberVideo(sessionId) {
+    console.log(`[사용자 퇴장] ${sessionId}`);
+
+    if (peerConnections[sessionId]) {
+        peerConnections[sessionId].close();
+        delete peerConnections[sessionId];
+    }
 
     // 원격 비디오 삭제
     const remoteVideo = document.getElementById(sessionId);
@@ -253,6 +337,9 @@ function removeMemberVideo(sessionId) {
                 label.remove(); // 멤버 이름 제거
             }
         }
+
+        // 비디오 클릭 이벤트 제거
+        remoteVideo.replaceWith(remoteVideo.cloneNode(true));
     }
 
     // 멤버리스트에서 사용자 제거 (member-panel.js의 members 배열에서 제거)
@@ -268,10 +355,14 @@ function removeMemberVideo(sessionId) {
 
 // PeerConnection 생성 및 설정
 async function createPeerConnection(sessionId, type, event) {
-    console.log(`sessionId : ${sessionId}, type : ${type}, event : ${event}`);
+    console.log('[PeerConnection] 생성');
+    console.log(`event : ${event} / type : ${type} / sessionId : ${sessionId}`);
 
     if (peerConnections[sessionId]) {
         return;
+
+    } else {
+        console.log(`[사용자 접속] ${sessionId}`);
     }
 
     const peerConnection = new RTCPeerConnection({
@@ -293,7 +384,6 @@ async function createPeerConnection(sessionId, type, event) {
 
         await sender.setParameters(params);
     };
-
 
     // 내 로컬 미디어 트랙(비디오/오디오)을 `peerConnection`에 추가 (상대방과 공유할 트랙 설정)
     window.localStream.getTracks().forEach(track => peerConnection.addTrack(track, window.localStream));
@@ -318,14 +408,15 @@ async function createPeerConnection(sessionId, type, event) {
             if (type === 'manager') {
                 const managerVideo = document.getElementById("managerVideo");
                 managerVideo.srcObject = event.streams[0];
-            } else {
-                // 멤버 화면 생성
+            }
+
+            // 멤버 화면 생성
+            if (type === 'member') {
                 addMemberVideo(sessionId, event.streams[0]);
             }
 
         } else {
             console.log("중복된 ontrack 실행 방지됨.");
-
         }
     };
 
@@ -336,9 +427,23 @@ async function createPeerConnection(sessionId, type, event) {
     }
 }
 
-// Offer 생성 및 전송
+// join-member 수신
+async function handleJoinMember(sessionId) {
+    console.log('[first-join] 수신');
+    if (sessionId) {
+        console.log('[first-join] sessionId : ', sessionId);
+        mySessionId = sessionId;
+        sessionStorage.setItem('sessionId', sessionId);
+        socket.send(JSON.stringify({
+            event: 'join-member',
+            sessionId: sessionId
+        }));
+    }
+}
+
+// Offer 전송
 async function createOffer(sessionId) {
-    console.log('전달하기 위해 offer 생성합니다.')
+    console.log('[offer] 전송')
     if (!peerConnections[sessionId]) return;
     const peerConnection = peerConnections[sessionId];
 
@@ -358,14 +463,15 @@ async function createOffer(sessionId) {
             sessionId: mySessionId,
             recipientSessionId: sessionId
         }));
+
     } catch (error) {
-        console.error("Offer 생성 중 오류 발생:", error);
+        console.error("createOffer 프로세스 처리 중 오류 발생:", error);
     }
 }
 
-// Offer 처리 (상대방의 Offer 받기)
+// Offer 수신
 async function handleOffer(sessionId, offerSdp, type, event) {
-    console.log('상대방이 offer 보냈습니다.');
+    console.log('[offer] 수신')
 
     // 새로 들어온 멤버 입장에서의 화면 생성 (offer 받은 후 생성)
     if (!peerConnections[sessionId]) {
@@ -392,24 +498,18 @@ async function handleOffer(sessionId, offerSdp, type, event) {
 
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
+            await sendAnswer(sessionId, answer); // answer 전송
 
-            socket.send(JSON.stringify({
-                event: 'answer',
-                sdp: JSON.stringify(answer),
-                sessionId: mySessionId,
-                recipientSessionId: sessionId
-            }));
-
-            console.log(`상대방에게 answer 보냈습니다.`);
         } catch (error) {
-            console.error("Offer 처리 중 오류 발생:", error);
+            console.error("handleOffer 프로세스 처리 중 오류 발생:", error);
         }
     });
 }
 
-
-// Answer 처리
+// Answer 수신
 async function handleAnswer(sessionId, answerSdp) {
+    console.log('[answer] 수신')
+
     if (!peerConnections[sessionId]) {
         console.warn(`PeerConnection 없음: ${sessionId}`);
         return;
@@ -430,15 +530,27 @@ async function handleAnswer(sessionId, answerSdp) {
         try {
             const parsedAnswer = new RTCSessionDescription(JSON.parse(answerSdp));
             await peerConnection.setRemoteDescription(parsedAnswer);
-            console.log(`세션 ID ${sessionId}에 대한 Answer 처리 완료`);
         } catch (error) {
             console.error("Answer 설정 중 오류 발생:", error);
         }
     });
 }
 
-// ICE 후보 처리
+// answer 전송
+async function sendAnswer(sessionId, answer) {
+    console.log('[answer] 전송')
+    socket.send(JSON.stringify({
+        event: 'answer',
+        sdp: JSON.stringify(answer),
+        sessionId: mySessionId,
+        recipientSessionId: sessionId
+    }));
+}
+
+
+// ice-candidate 전송
 function sendIceCandidate(sessionId, candidate) {
+    console.log('[ice-candidate] 전송')
     socket.send(JSON.stringify({
         event: 'ice-candidate',
         candidate: JSON.stringify(candidate),
@@ -447,18 +559,84 @@ function sendIceCandidate(sessionId, candidate) {
     }));
 }
 
-function handleIceCandidate(sessionId, candidate) {
+// ice-candidate 수신
+async function handleIceCandidate(sessionId, candidate) {
+    console.log('[ice-candidate] 수신')
     const peerConnection = peerConnections[sessionId];
 
     try {
         const parsedCandidate = new RTCIceCandidate(JSON.parse(candidate));
-        peerConnection.addIceCandidate(parsedCandidate);
+        await peerConnection.addIceCandidate(parsedCandidate);
     } catch (error) {
         console.error("ICE 후보 처리 중 오류 발생:", error);
     }
 }
 
-// WebRTC Offer/Answer 처리를 순차적으로 실행하는 큐
+// microphone 전송
+function sendMicrophone(value) {
+    console.log('[microphone] 전송')
+
+    const sessionId = document.getElementById('videoModalSessionId').value;
+    if (sessionId) {
+
+        const microphoneControlBtn = document.getElementById('microphoneControlBtn');
+
+        let isEnabled;
+
+        // 모달 창 닫기
+        if (value === false) {
+            microphoneControlBtn.style.backgroundImage = "url('/images/mic-enabled-false.png')";
+            document.getElementById('microphoneIsEnabled').value = 'false';
+            isEnabled = 'false';
+
+            // inEnabled 토글 처리
+        } else {
+            isEnabled = document.getElementById('microphoneIsEnabled').value;
+            if (isEnabled === 'false') {
+                microphoneControlBtn.style.backgroundImage = "url('/images/mic-enabled-true.png')";
+                document.getElementById('microphoneIsEnabled').value = 'true';
+                isEnabled = 'true';
+
+            } else if (isEnabled === 'true') {
+                microphoneControlBtn.style.backgroundImage = "url('/images/mic-enabled-false.png')";
+                document.getElementById('microphoneIsEnabled').value = 'false';
+                isEnabled = 'false';
+
+            } else {
+                console.log('isEnabled 값이 없습니다.');
+                return;
+            }
+        }
+
+        socket.send(JSON.stringify({
+            event: 'microphone',
+            isEnabled: isEnabled,
+            sessionId: mySessionId,
+            recipientSessionId: sessionId
+        }));
+
+    } else {
+        console.log('[microphone] sessionId 값이 없습니다.')
+    }
+}
+
+// microphone 수신
+async function handleIceMicrophone(sessionId, isEnabled) {
+    console.log('[microphone] 수신');
+
+    if (peerConnections[sessionId]) {
+        console.log('[microphone] isEnabled : ', isEnabled);
+        window.localStream.getAudioTracks().forEach(track => {
+            if (isEnabled === 'true') {
+                track.enabled = true;
+            } else if (isEnabled === 'false') {
+                track.enabled = false;
+            }
+        });
+    }
+}
+
+// WebRTC Offer/Answer 처리를 순차적으로 실행하는 Queue
 class SignalingQueue {
     constructor() {
         this.queue = [];

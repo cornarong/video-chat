@@ -47,6 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (originalStream) {
             managerVideo.srcObject = originalStream; // 원래 카메라 스트림 복원
             const cameraTrack = originalStream.getVideoTracks()[0];
+            console.log('cameraTrack = ', cameraTrack)
 
             Object.values(peerConnections).forEach(peerConnection => {
                 const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
@@ -55,6 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // 기존 로컬 스트림에서 비디오 트랙을 교체
             if (window.localStream) {
+                screenStream.getTracks().forEach(track => track.stop());
                 const audioTracks = window.localStream.getAudioTracks(); // 기존 오디오 트랙 유지
                 window.localStream = new MediaStream([cameraTrack, ...audioTracks]); // 로컬 스트림 업데이트
             }
