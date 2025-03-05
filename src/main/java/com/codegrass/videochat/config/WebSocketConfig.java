@@ -1,4 +1,4 @@
-package com.codegrass.facetalk.config;
+package com.codegrass.videochat.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;

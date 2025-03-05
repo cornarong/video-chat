@@ -1,4 +1,4 @@
-package com.codegrass.facetalk.controller.webrtc;
+package com.codegrass.videochat.controller.webrtc;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;

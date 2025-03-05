@@ -1,4 +1,4 @@
-### 📌 FaceTalk
+### 📌 video-chat
 <h6>
 
 WebRTC와 WebSocket을 활용하여 실시간 화상 채팅을 제공하는 프로젝트.
@@ -24,10 +24,10 @@ WebRTC API:
 ### 📌 프로젝트 구조
 
 ```
-FaceTalk
+videochat
 │── src
 │   ├── main
-│   │   ├── java/com/codegrass/facetalk
+│   │   ├── java/com/codegrass/videochat
 │   │   │   ├── config          # WebSocket 설정 및 시그널링 처리 핸들러
 │   │   │   ├── controller      # 채팅방 생성 및 VIEW 반환 컨트롤러
 │── resources

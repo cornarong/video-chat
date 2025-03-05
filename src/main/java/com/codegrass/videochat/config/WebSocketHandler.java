@@ -1,4 +1,4 @@
-package com.codegrass.facetalk.config;
+package com.codegrass.videochat.config;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
