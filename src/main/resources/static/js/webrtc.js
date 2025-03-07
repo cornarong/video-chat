@@ -279,19 +279,6 @@ function showVideoModal(emptyVideoSlot) {
     memberVideoModal.style.display = "flex";
     setTimeout(() => memberVideoModal.classList.add("show"), 10); // 약간의 지연 후 애니메이션 적용
 
-/*    // 스피너 표시 (비디오 로딩 중)
-    const videoModal = document.getElementById('videoModal');
-
-    const spinner = document.createElement("div");
-    spinner.classList.add("spinner");
-    memberVideoModal.appendChild(spinner); // 모달 내부에 스피너 추가
-
-    // 1초 후 스피너 제거 & 비디오 표시
-    setTimeout(() => {
-        spinner.remove(); // 스피너 삭제
-        videoModal.srcObject = emptyVideoSlot.srcObject;
-    }, 0); // 1.2초 딜레이*/
-
     // 우측 멤버 카메라 오버레이를 보이게 설정
     document.querySelectorAll(".overlay").forEach(overlayElement => {
         overlayElement.style.display = "block";
