@@ -219,7 +219,7 @@ video.memberVideo {
     position: fixed;
     top: 50%;
     right: 25%;
-    transform: translate(50%, -50%) scale(0.8); /* 처음에는 작게 시작 */
+    transform: translate(50%, -50%) scale(0.4); /* 처음에는 작게 시작 */
     width: 40%;
     height: auto;
     background: rgba(0, 0, 0, 0.9);
@@ -231,7 +231,7 @@ video.memberVideo {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     z-index: 100;
     opacity: 0;
-    transition: transform 0.3s ease-out, opacity 0.3s ease-out; /* 부드럽게 등장 */
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out; /* 부드럽게 등장 */
 }
 
 #memberVideoModal.show {

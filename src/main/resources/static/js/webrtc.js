@@ -149,7 +149,11 @@ async function getMediaStream() {
                 audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
                 // 오디오 트랙 비활성화 (음소거)
                 audioStream.getAudioTracks().forEach(track => {
-                    track.enabled = false;
+                    if (myType === 'manager') {
+                        track.enabled = true;
+                    } else {
+                        track.enabled = false;
+                    }
                 });
             } else {
                 console.warn("사용 가능한 마이크가 없습니다. 무음 트랙을 반환합니다.");
@@ -266,12 +270,16 @@ function showVideoModal(emptyVideoSlot) {
     // 모달에서 사용할 세션 ID를 설정
     document.getElementById('videoModalSessionId').value = emptyVideoSlot.id;
 
+    // 비디오 삽입
+    const videoModal = document.getElementById('videoModal');
+    videoModal.srcObject = emptyVideoSlot.srcObject;
+
     // 멤버 비디오 모달 열기
     const memberVideoModal = document.getElementById("memberVideoModal");
     memberVideoModal.style.display = "flex";
     setTimeout(() => memberVideoModal.classList.add("show"), 10); // 약간의 지연 후 애니메이션 적용
 
-    // 스피너 표시 (비디오 로딩 중)
+/*    // 스피너 표시 (비디오 로딩 중)
     const videoModal = document.getElementById('videoModal');
 
     const spinner = document.createElement("div");
@@ -282,7 +290,7 @@ function showVideoModal(emptyVideoSlot) {
     setTimeout(() => {
         spinner.remove(); // 스피너 삭제
         videoModal.srcObject = emptyVideoSlot.srcObject;
-    }, 1200); // 1.2초 딜레이
+    }, 0); // 1.2초 딜레이*/
 
     // 우측 멤버 카메라 오버레이를 보이게 설정
     document.querySelectorAll(".overlay").forEach(overlayElement => {
@@ -407,7 +415,14 @@ async function createPeerConnection(sessionId, type, event) {
             // 관리자 화면 생성
             if (type === 'manager') {
                 const managerVideo = document.getElementById("managerVideo");
-                managerVideo.srcObject = event.streams[0];
+                const stream = event.streams[0];
+                managerVideo.srcObject = stream;
+
+                // 오디오 태그를 따로 생성해서 관리자 소리 재생
+                const audioElement = new Audio();
+                audioElement.srcObject = stream;
+                audioElement.autoplay = true;
+                audioElement.play();
             }
 
             // 멤버 화면 생성
