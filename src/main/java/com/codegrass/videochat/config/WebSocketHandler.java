@@ -29,7 +29,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         try {
-            log.info("[first-join] session = {}", session);
             String roomId = getRoomIdFromSession(session);
             String sessionId = getSessionIdFromSession(session);
             String type = extractTypeFromUri(session);
@@ -39,9 +38,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 List<String> roomMembers = rooms.get(roomId).values().stream()
                         .map(WebSocketSession::getId)
                         .collect(Collectors.toList());
-                if (!roomMembers.isEmpty()) {
-                    log.info("[first-join] 현재 방에 있는 인원들 = {}", roomMembers.get(0));
-                } else {
+                if (roomMembers.isEmpty()) {
                     log.info("[first-join] 현재 방이 비어 있습니다.");
                 }
             } else {
@@ -53,14 +50,14 @@ public class WebSocketHandler extends TextWebSocketHandler {
             if ("manager".equals(type)) {
                 Boolean isManager = roomManagerMap.get(roomId);
                 if (isManager != null && isManager) {
-                    log.info("[first-join] 이미 방장이 존재합니다. roomId = {}", roomId);
+                    log.info("[first-join] 매니저가 존재합니다. roomId = {}", roomId);
                     return;
                 } else {
-                    log.info("[first-join] 매니저가 입장장하였습니다. roomId = {}", roomId);
+                    log.info("[first-join] 매니저 입장 roomId = {}, sessionId = {}", roomId, session);
                     roomManagerMap.put(roomId, true);
                 }
             } else {
-                log.info("[first-join] 멤버가 입장장하였습니다. roomId = {}", roomId);
+                log.info("[first-join] 멤버 입장 roomId = {}, sessionId = {}", roomId, session);
             }
 
             // 세션(멤버)을 방에 추가
@@ -125,7 +122,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
             switch (event) {
                 case "join-member":
-                    log.info("[join-member] {} 님이 접속하였습니다.", sessionId);
                     broadcastToRoomExceptSender(roomId, event, type, sessionId);
                     break;
 
@@ -210,7 +206,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     // 특정 사용자에게 microphone 메시지 전송 (microphone)
-    private void sendMicMessageToUser (String roomId, String event, String type, String sessionId, String recipientSessionId, String isEnabled) {
+    private void sendMicMessageToUser(String roomId, String event, String type, String sessionId, String recipientSessionId, String isEnabled) {
         JsonObject sendJsonMessage = new JsonObject();
         sendJsonMessage.addProperty("event", event);
         sendJsonMessage.addProperty("type", type);
