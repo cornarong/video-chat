@@ -2,7 +2,7 @@ const path = window.location.pathname;
 const roomId = path.split("/")[2];  // 방번호
 const myType = path.split("/")[3];  // 회원 or 관리자
 
-let mySessionId = sessionStorage.getItem('sessionId') || '';
+let mySessionId = '';
 let peerConnections = {};  // 각 방의 PeerConnection 관리
 let signalingQueues = {};  // 각 PeerConnection Offer/Answer 처리를 위한 큐 관리 객체
 let sentIceCandidates = new Set();  // 중복된 ICE 후보 전송 방지용
@@ -57,18 +57,24 @@ socket.onmessage = async (event) => {
         const message = JSON.parse(event.data);
 
         if (!window.localStream) {
-            try {
-                window.localStream = await getMediaStream();
-            } catch (error) {
-                window.localStream = new MediaStream(); // 빈 스트림 반환
-                console.error("미디어 스트림 설정 실패:", error);
+
+            if(message.event === 'first-join') {
+
+                try {
+                    window.localStream = await getMediaStream();
+
+                } catch (error) {
+
+                    window.localStream = new MediaStream(); // 빈 스트림 반환
+                    console.error("미디어 스트림 설정 실패:", error);
+                }
+
+                // 관리자 화면 생성
+                if (myType === 'manager') addManagerVideo(window.localStream);
+
+                // 멤버 화면 생성
+                if (myType === 'member') addMemberVideo(message.sessionId, window.localStream);
             }
-
-            // 관리자 화면 생성
-            if (myType === 'manager') addManagerVideo(window.localStream);
-
-            // 멤버 화면 생성
-            if (myType === 'member') addMemberVideo(mySessionId, window.localStream);
         }
 
         switch (message.event) {
@@ -97,7 +103,15 @@ socket.onmessage = async (event) => {
                 break;
 
             case 'microphone':
-                await handleIceMicrophone(message.sessionId, message.isEnabled);
+                await handleMicrophone(message.sessionId, message.isEnabled);
+                break;
+
+            case 'kick':
+                await handleKick(message.sessionId);
+                break;
+
+            case 'refresh':
+                await handleRefresh(message.sessionId);
                 break;
 
             default:
@@ -246,7 +260,23 @@ function addMemberVideo(sessionId, stream) {
         emptyWrapper.appendChild(label); // `video-wrapper` 안에 추가
 
         // 클릭한 비디오를 모달에 표시하는 이벤트 리스너 추가
-        emptyVideoSlot.addEventListener("click", () => showVideoModal(emptyVideoSlot));
+        if(myType === 'manager') {
+            emptyVideoSlot.addEventListener("click", () => showVideoModal(emptyVideoSlot));
+            emptyVideoSlot.style.cursor = 'pointer';
+
+            // 마우스를 올렸을 때 테두리 추가
+            emptyVideoSlot.addEventListener("mouseenter", () => {
+                emptyVideoSlot.style.border = '2px solid #007bff';
+                emptyVideoSlot.style.position = 'relative';
+                emptyVideoSlot.style.zIndex = '10';
+            });
+
+            emptyVideoSlot.addEventListener("mouseleave", () => {
+                emptyVideoSlot.style.border = '';
+                emptyVideoSlot.style.position = '';
+                emptyVideoSlot.style.zIndex = '';
+            });
+        }
 
         // 멤버리스트에 사용자 추가 (중복 방지) : member-panel.js의 members 배열에 추가
         if (!window.members.includes(sessionId)) {
@@ -289,6 +319,8 @@ function showVideoModal(emptyVideoSlot) {
 function closeVideoModal() {
     const memberVideoModal = document.getElementById("memberVideoModal");
 
+    document.getElementById('videoModalSessionId').value = '';
+
     memberVideoModal.classList.remove("show"); // 애니메이션 효과 제거
     setTimeout(() => {
         memberVideoModal.style.display = "none"; // 애니메이션 끝난 후 숨기기
@@ -308,6 +340,12 @@ function closeVideoModal() {
 // left-member 수신 (멤버 화면 제거 + 멤버 이름 제거 + 멤버 리스트에 이름 삭제)
 async function removeMemberVideo(sessionId) {
     console.log(`[사용자 퇴장] ${sessionId}`);
+
+    let videoModalSessionId = document.getElementById('videoModalSessionId').value
+    if(videoModalSessionId === sessionId) {
+            alert(`[${sessionId}]님이 퇴장하였습니다.`);
+            closeVideoModal();
+    }
 
     if (peerConnections[sessionId]) {
         peerConnections[sessionId].close();
@@ -435,7 +473,6 @@ async function handleJoinMember(sessionId) {
     if (sessionId) {
         console.log('[first-join] sessionId : ', sessionId);
         mySessionId = sessionId;
-        sessionStorage.setItem('sessionId', sessionId);
         socket.send(JSON.stringify({
             event: 'join-member',
             sessionId: sessionId
@@ -549,7 +586,6 @@ async function sendAnswer(sessionId, answer) {
     }));
 }
 
-
 // ice-candidate 전송
 function sendIceCandidate(sessionId, candidate) {
     console.log('[ice-candidate] 전송')
@@ -623,7 +659,7 @@ function sendMicrophone(value) {
 }
 
 // microphone 수신
-async function handleIceMicrophone(sessionId, isEnabled) {
+async function handleMicrophone(sessionId, isEnabled) {
     console.log('[microphone] 수신');
 
     if (peerConnections[sessionId]) {
@@ -635,6 +671,24 @@ async function handleIceMicrophone(sessionId, isEnabled) {
                 track.enabled = false;
             }
         });
+    }
+}
+
+// kick 수신
+async function handleKick(sessionId) {
+    console.log('[kick] 수신');
+
+    if (peerConnections[sessionId]) {
+        window.location.href = `/videoChat/${roomId}/kickedOut`;
+    }
+}
+
+// refresh 수신
+async function handleRefresh(sessionId) {
+    console.log('[refresh] 수신');
+
+    if (peerConnections[sessionId]) {
+        window.location.reload();
     }
 }
 

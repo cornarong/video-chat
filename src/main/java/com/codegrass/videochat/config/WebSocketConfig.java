@@ -18,7 +18,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(webSocketHandler, "/ws/**")
+        registry.addHandler(webSocketHandler, "/ws/**", "/wss/**")
                 .setAllowedOrigins("*"); // roomId를 포함한 URL 매핑
     }
 }

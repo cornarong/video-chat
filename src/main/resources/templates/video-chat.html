@@ -50,6 +50,14 @@
     <button id="microphoneControlBtn" onclick="sendMicrophone()"></button>
 </div>
 
+<script>
+    const pathname = window.location.pathname;
+    const role = pathname.split('/').pop();
+    console.log('role = ', role);
+    if(role !== 'manager') {
+        document.getElementById('toggleScreenShare').style.display = 'none';
+    }
+</script>
 <script src='/js/webrtc.js'></script>
 <script type="module" src="/js/member-panel.js" defer></script>
 <script type="module" src="/js/video-grid.js" defer></script>

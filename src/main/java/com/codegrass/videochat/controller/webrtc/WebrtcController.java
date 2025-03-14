@@ -18,4 +18,10 @@ public class WebrtcController {
         }
         return null;
     }
+
+    @GetMapping("/videoChat/{roomId}/kickedOut")
+    public String kickedOut(@PathVariable String roomId, Model model) {
+        model.addAttribute("roomId", roomId);
+        return "kicked-out";
+    }
 }

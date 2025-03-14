@@ -50,14 +50,14 @@ public class WebSocketHandler extends TextWebSocketHandler {
             if ("manager".equals(type)) {
                 Boolean isManager = roomManagerMap.get(roomId);
                 if (isManager != null && isManager) {
-                    log.info("[first-join] 매니저가 존재합니다. roomId = {}", roomId);
+                    log.info("[first-join] 이미 매니저가 존재합니다. roomId = [{}]", roomId);
                     return;
                 } else {
-                    log.info("[first-join] 매니저 입장 roomId = {}, sessionId = {}", roomId, session);
+                    log.info("[first-join] 매니저가 입장하였습니다. roomId = [{}], sessionId = [{}]", roomId, session);
                     roomManagerMap.put(roomId, true);
                 }
             } else {
-                log.info("[first-join] 멤버 입장 roomId = {}, sessionId = {}", roomId, session);
+                log.info("[first-join] 멤버가 입장하였습니다. roomId = [{}], sessionId = [{}]", roomId, session);
             }
 
             // 세션(멤버)을 방에 추가
@@ -68,7 +68,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
             sendJsonMessage.addProperty("sessionId", sessionId);
             String sendMessageContent = new Gson().toJson(sendJsonMessage);
             session.sendMessage(new TextMessage(sendMessageContent));
-            log.info("[first-join] 화면로드 sessionId = {} 전달.", sessionId);
+            log.info("[first-join] 화면로드 sessionId = [{}] 전달.", sessionId);
 
         } catch (Exception e) {
             log.error("exception : ", e);
@@ -78,22 +78,22 @@ public class WebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         try {
-            log.info("[left-member] session = {}", session);
+            log.info("[left-member] session = [{}]", session);
             String roomId = getRoomIdFromSession(session);
             String sessionId = getSessionIdFromSession(session);
             String type = extractTypeFromUri(session);
 
             if (roomId == null || !rooms.containsKey(roomId)) {
-                log.info("[left-member] 존재하지 않는 방입니다. roomId = {}", roomId);
+                log.info("[left-member] 존재하지 않는 방입니다. roomId = [{}]", roomId);
                 return;
             }
 
             // 방의 관리자인 경우
             if ("manager".equals(type)) {
-                log.info("[left-member] 매니저가 퇴장하였습니다. roomId = {}", roomId);
+                log.info("[left-member] 매니저가 퇴장하였습니다. roomId = [{}]", roomId);
                 roomManagerMap.remove(roomId);
             } else {
-                log.info("[left-member] 멤버가 퇴장하였습니다. roomId = {}", roomId);
+                log.info("[left-member] 멤버가 퇴장하였습니다. roomId = [{}]", roomId);
             }
 
             rooms.get(roomId).remove(session.getId());
@@ -141,6 +141,14 @@ public class WebSocketHandler extends TextWebSocketHandler {
                     handleMicrophone(roomId, event, type, sessionId, jsonMessage);
                     break;
 
+                case "kick":
+                    kick(roomId, event, type, sessionId, jsonMessage);
+                    break;
+
+                case "refresh":
+                    refresh(roomId, event, type, sessionId, jsonMessage);
+                    break;
+
                 default:
                     log.warn("알 수 없는 이벤트 = {}", event);
                     break;
@@ -157,7 +165,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String offerSdp = jsonMessage.get("sdp").getAsString();
         JsonObject offerJson = JsonParser.parseString(offerSdp).getAsJsonObject();
 
-        // 새로 들어온 사용자에게 offer 전달
         sendToUser(roomId, event, type, sessionId, recipientSessionId, offerJson.toString());
     }
 
@@ -167,7 +174,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String answerSdp = jsonMessage.get("sdp").getAsString();
         JsonObject answerJson = JsonParser.parseString(answerSdp).getAsJsonObject();
 
-        // 새로 들어온 사용자에게 offer 전달
         sendToUser(roomId, event, type, sessionId, recipientSessionId, answerJson.toString());
     }
 
@@ -177,7 +183,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String candidateString = jsonMessage.get("candidate").getAsString();
         JsonObject candidateJson = JsonParser.parseString(candidateString).getAsJsonObject();
 
-        // 특정 사용자에게 ice-candidate 전달
         sendToUser(roomId, event, type, sessionId, recipientSessionId, candidateJson.toString());
     }
 
@@ -186,11 +191,24 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String recipientSessionId = jsonMessage.get("recipientSessionId").getAsString();
         String isEnabled = jsonMessage.get("isEnabled").getAsString();
 
-        // 특정 사용자에게 ice-candidate 전달
         sendMicMessageToUser(roomId, event, type, sessionId, recipientSessionId, isEnabled);
     }
 
-    // 특정 사용자에게만 메시지 전송 (offer, answer, ice-candidate)
+    // kick 핸들러
+    private void kick(String roomId, String event, String type, String sessionId, JsonObject jsonMessage) {
+        String recipientSessionId = jsonMessage.get("recipientSessionId").getAsString();
+
+        sendKicMessageToUser(roomId, event, type, sessionId, recipientSessionId);
+    }
+
+    // refresh 핸들러
+    private void refresh(String roomId, String event, String type, String sessionId, JsonObject jsonMessage) {
+        String recipientSessionId = jsonMessage.get("recipientSessionId").getAsString();
+
+        sendRefreshMessageToUser(roomId, event, type, sessionId, recipientSessionId);
+    }
+
+    // 특정 사용자에게 메시지 전송 (offer, answer, ice-candidate)
     private void sendToUser(String roomId, String event, String type, String sessionId, String recipientSessionId, String data) {
         JsonObject sendJsonMessage = new JsonObject();
         sendJsonMessage.addProperty("event", event);
@@ -205,13 +223,41 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // 특정 사용자에게 microphone 메시지 전송 (microphone)
+    // 특정 사용자에게 메시지 전송 (microphone)
     private void sendMicMessageToUser(String roomId, String event, String type, String sessionId, String recipientSessionId, String isEnabled) {
         JsonObject sendJsonMessage = new JsonObject();
         sendJsonMessage.addProperty("event", event);
         sendJsonMessage.addProperty("type", type);
         sendJsonMessage.addProperty("sessionId", sessionId);
         sendJsonMessage.addProperty("isEnabled", isEnabled);
+        String sendMessageContent = new Gson().toJson(sendJsonMessage);
+
+        WebSocketSession recipientSession = rooms.get(roomId).get(recipientSessionId);
+        if (recipientSession != null) {
+            sendSafeMessage(recipientSession, sendMessageContent);
+        }
+    }
+
+    // 특정 사용자에게 메시지 전송 (kick)
+    private void sendKicMessageToUser(String roomId, String event, String type, String sessionId, String recipientSessionId) {
+        JsonObject sendJsonMessage = new JsonObject();
+        sendJsonMessage.addProperty("event", event);
+        sendJsonMessage.addProperty("type", type);
+        sendJsonMessage.addProperty("sessionId", sessionId);
+        String sendMessageContent = new Gson().toJson(sendJsonMessage);
+
+        WebSocketSession recipientSession = rooms.get(roomId).get(recipientSessionId);
+        if (recipientSession != null) {
+            sendSafeMessage(recipientSession, sendMessageContent);
+        }
+    }
+
+    // 특정 사용자에게 메시지 전송 (refresh)
+    private void sendRefreshMessageToUser(String roomId, String event, String type, String sessionId, String recipientSessionId) {
+        JsonObject sendJsonMessage = new JsonObject();
+        sendJsonMessage.addProperty("event", event);
+        sendJsonMessage.addProperty("type", type);
+        sendJsonMessage.addProperty("sessionId", sessionId);
         String sendMessageContent = new Gson().toJson(sendJsonMessage);
 
         WebSocketSession recipientSession = rooms.get(roomId).get(recipientSessionId);

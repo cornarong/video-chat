@@ -1,0 +1,85 @@
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <Pattern>
+                %highlight([%level]) %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %logger{36} - %method - %msg%n
+            </Pattern>
+        </encoder>
+    </appender>
+
+    <appender name="fileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>./logs/log.%d{yyyyMMdd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>15MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <Pattern>
+                %highlight([%level]) %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %logger{36} - %method - %msg%n
+            </Pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.codegrass" level="info"/>
+    <logger name="org" level="warn"/>
+    <logger name="javax" level="warn"/>
+    <logger name="sun" level="warn"/>
+    <logger name="com.zaxxer" level="warn"/>
+    <logger name="jdbc.resultset" level="warn"/>
+    <logger name="jdbc.audit" level="warn"/>
+    <logger name="jdbc.sqlonly" level="warn"/>
+    <logger name="jdbc.resultsettable" level="warn"/>
+    <logger name="jdbc.sqltiming" level="warn"/>
+    <logger name="org.apache.kafka" level="warn"/>
+    <logger name="org.springframework" level="info"/>
+
+    <springProfile name="prod">
+        <logger name="jdbc.resultset" level="warn"/>
+        <logger name="jdbc.sqlonly" level="warn"/>
+        <logger name="jdbc.resultsettable" level="warn"/>
+        <logger name="jdbc.sqltiming" level="warn"/>
+    </springProfile>
+    <springProfile name="stg">
+        <logger name="jdbc.resultset" level="warn"/>
+        <logger name="jdbc.sqlonly" level="warn"/>
+        <logger name="jdbc.resultsettable" level="warn"/>
+        <logger name="jdbc.sqltiming" level="warn"/>
+    </springProfile>
+    <springProfile name="dev">
+        <logger name="jdbc.resultset" level="warn"/>
+        <logger name="jdbc.sqlonly" level="info"/>
+        <logger name="jdbc.resultsettable" level="info"/>
+        <logger name="jdbc.sqltiming" level="warn"/>
+    </springProfile>
+    <springProfile name="local">
+        <logger name="jdbc.resultset" level="warn"/>
+        <logger name="jdbc.sqlonly" level="info"/>
+        <logger name="jdbc.resultsettable" level="info"/>
+        <logger name="jdbc.sqltiming" level="warn"/>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="info">
+            <appender-ref ref="fileAppender"/>
+        </root>
+    </springProfile>
+    <springProfile name="local">
+        <root level="warn">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    <springProfile name="stg">
+        <root level="warn">
+            <appender-ref ref="fileAppender"/>
+        </root>
+    </springProfile>
+    <springProfile name="dev">
+        <root level="info">
+            <appender-ref ref="fileAppender"/>
+        </root>
+    </springProfile>
+</configuration>
